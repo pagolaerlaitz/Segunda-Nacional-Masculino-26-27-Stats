@@ -1,0 +1,6 @@
+[theme]
+primaryColor = "#F97316"       # Naranja para botones y destacados (paleta naranja / negro / gris)
+backgroundColor = "#000000"    # Fondo general negro profundo
+secondaryBackgroundColor = "#1A1A1A" # Paneles en negro ligeramente más claro
+textColor = "#FFFFFF"          # Textos en blanco puro
+font = "sans serif"
