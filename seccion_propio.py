@@ -737,12 +737,14 @@ def apartado_ataque(h, id_propio, ultimos_n, df_at, nombres):
         mostrar_resumen(res, "Sistema", ppp_equipo)
 
         subtitulo("¿Cómo se finaliza cada sistema?")
-        sistemas = [s for s in res["grupo"] if s != "Sin sistema"]
+        sistemas = res["grupo"].tolist()  # incluye "Sin sistema" (posesiones sin sistema etiquetado)
         if sistemas:
             sistema = st.selectbox("Sistema", sistemas, key="propio_sistema")
-            df_sis = df_at[df_at["sistema"] == sistema]
+            sin_sistema = sistema == "Sin sistema"
+            df_sis = df_at[df_at["sistema"].isna()] if sin_sistema else df_at[df_at["sistema"] == sistema]
             ppp_sis = df_sis["puntos"].sum() / len(df_sis)
-            st.caption(f"{len(df_sis)} posesiones con {sistema} · {ppp_sis:.2f} PPP. En las tres tablas, Frecuencia es "
+            descripcion = "sin sistema" if sin_sistema else f"con {sistema}"
+            st.caption(f"{len(df_sis)} posesiones {descripcion} · {ppp_sis:.2f} PPP. En las tres tablas, Frecuencia es "
                        "el % de esas posesiones y el color compara con el PPP del sistema.")
             st.markdown("**Con qué playtype**")
             mostrar_resumen(resumen_por(df_sis, "playtype"), "Playtype final", ppp_sis)
