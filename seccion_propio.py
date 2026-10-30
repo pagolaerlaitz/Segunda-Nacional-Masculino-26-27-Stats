@@ -20,8 +20,9 @@ TIROS_CAMPO = (93, 94, 97, 98, 100)
 CANASTAS_CAMPO = (93, 94, 100)
 TRIPLES = (94, 98)
 PLAYTYPES_PR = ("P&R Handler", "P&R Roller")
-APARTADOS = ["Quintetos", "Estadística", "Ataque", "Defensa", "Análisis Individual"]
-ICONOS_APARTADO = {"Quintetos": "🔄", "Estadística": "📈", "Ataque": "⚔️", "Defensa": "🛡️", "Análisis Individual": "👤"}
+APARTADOS = ["Quintetos", "Estadística", "Ataque", "Defensa", "Cuartos", "Análisis Individual"]
+ICONOS_APARTADO = {"Quintetos": "🔄", "Estadística": "📈", "Ataque": "⚔️", "Defensa": "🛡️", "Cuartos": "⏱️",
+                   "Análisis Individual": "👤"}
 
 DEF_POSESIONES = "Finales de posesión etiquetados: tiro de campo, pérdida o falta con tiros libres."
 DEF_FRECUENCIA = "Porcentaje de las posesiones de este apartado que corresponden a cada fila."
@@ -1246,5 +1247,9 @@ def mostrar_propio(h):
         elif apartado == "Defensa":
             plantilla = h.cargar_plantilla(id_propio)["id_jugador"].astype(int).tolist()
             apartado_defensa(df_def, nombres, plantilla)
+        elif apartado == "Cuartos":
+            import seccion_cuartos  # aquí y no arriba: seccion_cuartos importa utilidades de este módulo
+            seccion_cuartos.mostrar_cuartos(h, id_propio, ultimos_n,
+                                            por_periodo=seccion_cuartos.propio_por_cuarto(h, df_at))
         else:
             apartado_individual(h, id_propio, nombres, df_at, ultimos_n)
