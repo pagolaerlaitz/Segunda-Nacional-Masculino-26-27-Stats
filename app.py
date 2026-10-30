@@ -10,6 +10,7 @@ import altair as alt
 import plotly.graph_objects as go
 from types import SimpleNamespace
 
+import seccion_cuartos
 import seccion_partidos
 import seccion_propio
 from alimentar_bd import asegurar_fecha_iso
@@ -403,9 +404,16 @@ def calcular_stats_avanzadas_liga(ultimos_n=None):
         return pd.DataFrame()
 
 @st.cache_data
-def calcular_stats_individuales_liga(ultimos_n=None):
+def calcular_stats_individuales_liga(ultimos_n=None, periodo=None):
+    """`periodo`: None (partido completo), 1-4 (un cuarto) u "OT" (prórrogas)."""
     try:
         conexion = sqlite3.connect("mi_liga.db")
+        if periodo is None:
+            filtro_periodo = ""
+        elif periodo == "OT":
+            filtro_periodo = "AND pb.period > 4"
+        else:
+            filtro_periodo = f"AND pb.period = {int(periodo)}"
 
         # 1. Filtro Partidos Válidos
         cte_limit = f"WHERE rn <= {ultimos_n}" if ultimos_n else ""
@@ -424,7 +432,7 @@ def calcular_stats_individuales_liga(ultimos_n=None):
         df_valid = pd.read_sql(query_valid, conexion)
 
         # 2. Volumen Base (Individual)
-        query_pbp = "SELECT id_partido, id_equipo, id_jugador, idMove FROM play_by_play WHERE id_jugador IS NOT NULL"
+        query_pbp = f"SELECT pb.id_partido, pb.id_equipo, pb.id_jugador, pb.idMove FROM play_by_play pb WHERE pb.id_jugador IS NOT NULL {filtro_periodo}"
         df_pbp = pd.read_sql(query_pbp, conexion)
         df_pbp = df_pbp.merge(df_valid, on=['id_equipo', 'id_partido'], how='inner')
 
@@ -444,12 +452,12 @@ def calcular_stats_individuales_liga(ultimos_n=None):
         df_indiv = df_pbp.groupby(['id_jugador', 'id_equipo'])[cols_to_sum].sum().reset_index()
 
         # 3. STATS EXACTAS EN PISTA Y DIFERENCIALES (Advanced Stats Base)
-        query_all_pbp = """
+        query_all_pbp = f"""
             SELECT pb.id_partido, pb.idMove, pb.id_equipo, pb.quinteto_local, pb.quinteto_visitante,
                    p.id_equipo_local, p.id_equipo_visitante
             FROM play_by_play pb
             JOIN partidos p ON pb.id_partido = p.id_partido
-            WHERE pb.id_equipo IS NOT NULL
+            WHERE pb.id_equipo IS NOT NULL {filtro_periodo}
         """
         df_all_pbp = pd.read_sql(query_all_pbp, conexion)
 
@@ -506,12 +514,13 @@ def calcular_stats_individuales_liga(ultimos_n=None):
         df_final = df_final.merge(opp_totals, on='id_equipo', how='left').fillna(0)
 
         # 4. CÁLCULO CRONOLÓGICO DE MINUTOS REALES Y CONVOCATORIAS
-        query_time = """
-            SELECT pb.id_partido, pb.period, pb.min, pb.sec, 
+        query_time = f"""
+            SELECT pb.id_partido, pb.period, pb.min, pb.sec,
                    pb.quinteto_local, pb.quinteto_visitante,
                    p.id_equipo_local, p.id_equipo_visitante
             FROM play_by_play pb
             JOIN partidos p ON pb.id_partido = p.id_partido
+            WHERE 1 = 1 {filtro_periodo}
         """
         df_time = pd.read_sql(query_time, conexion)
         conexion.close()
@@ -686,6 +695,57 @@ def calcular_stats_individuales_liga(ultimos_n=None):
     except Exception as e:
         st.error(f"Error calculando stats individuales: {e}")
         return pd.DataFrame()
+
+# Tablas de estadísticas individuales: columnas (nombre, es_porcentaje), rating y orden. Las usan Individuales y Cuartos
+TABLAS_INDIVIDUALES = {
+    "⏳ Minutos": {
+        "rating_col": None,
+        "sort_col": "% Minutos",
+        "columnas": [
+            ("Minutos Totales", False),
+            ("Minutos por partido", False),
+            ("% Minutos", True)
+        ]
+    },
+    "🎯 Anotación": {
+        "rating_col": "Rating Anotación",
+        "sort_col": "Rating Anotación",
+        "columnas": [
+            ("Puntos totales", False), ("Puntos por partido", False), ("Puntos p100", False),
+            ("%T2", True), ("2PA%", True),
+            ("%T3", True), ("3PA%", True),
+            ("%TL", True), ("FTr", False),
+            ("eFG%", True), ("TS%", True),
+            ("%USG", True)
+        ]
+    },
+    "🛡️ Rebote": {
+        "rating_col": "Rating Rebote",
+        "sort_col": "Rating Rebote",
+        "columnas": [
+            ("RD pp", False), ("RD p100", False), ("DREB%", True),
+            ("RO pp", False), ("RO p100", False), ("OREB%", True),
+            ("RT pp", False), ("RT p100", False), ("REB%", True)
+        ]
+    },
+    "🧠 Cuidado de balón": {
+        "rating_col": "Rating Cuidado de Balón",
+        "sort_col": "Rating Cuidado de Balón",
+        "columnas": [
+            ("Asistencias pp", False), ("Asistencias p100", False), ("AST%", True),
+            ("Pérdidas pp", False), ("Pérdidas p100", False), ("TOV%", True),
+            ("AST / TO", False)
+        ]
+    },
+    "🔒 Defensa": {
+        "rating_col": "Rating Defensa",
+        "sort_col": "Rating Defensa",
+        "columnas": [
+            ("STL pp", False), ("STL p100", False), ("STL%", True),
+            ("BLK pp", False), ("BLK p100", False), ("BLK%", True)
+        ]
+    }
+}
 
 @st.cache_data
 def calcular_stats_quinteto(id_equipo, lista_ids_jugadores, ultimos_n=None):
@@ -1674,6 +1734,8 @@ elif st.session_state.menu_principal == "Propio":
         obtener_foto_jugador_base64=obtener_foto_jugador_base64,
         calcular_stats_individuales_liga=calcular_stats_individuales_liga,
         grafico_uso_eficiencia=grafico_uso_eficiencia,
+        etiqueta_stat=etiqueta_stat,
+        tablas_individuales=TABLAS_INDIVIDUALES,
     ))
 
 elif st.session_state.menu_principal == "Liga":
@@ -2177,7 +2239,7 @@ elif st.session_state.menu_principal == "Liga":
                     if st.session_state.get('sub_vista_stats') in (None, 'Stats tradicionales', 'Stats avanzadas', 'Estado de Forma'):
                         st.session_state.sub_vista_stats = 'Stats'
 
-                    c1, c2, c3 = st.columns(3)
+                    c1, c2, c3, c4 = st.columns(4)
                     with c1:
                         if st.button("📈 Stats", use_container_width=True, type="primary" if st.session_state.sub_vista_stats == 'Stats' else "secondary"):
                             st.session_state.sub_vista_stats = 'Stats'
@@ -2189,6 +2251,10 @@ elif st.session_state.menu_principal == "Liga":
                     with c3:
                         if st.button("🔄 Quintetos", use_container_width=True, type="primary" if st.session_state.sub_vista_stats == 'Análisis de Quintetos' else "secondary"):
                             st.session_state.sub_vista_stats = 'Análisis de Quintetos'
+                            st.rerun()
+                    with c4:
+                        if st.button("⏱️ Cuartos", use_container_width=True, type="primary" if st.session_state.sub_vista_stats == 'Cuartos' else "secondary"):
+                            st.session_state.sub_vista_stats = 'Cuartos'
                             st.rerun()
 
                     col_title, col_filter = st.columns([3, 1])
@@ -2223,55 +2289,7 @@ elif st.session_state.menu_principal == "Liga":
                                 </div>
                                 """, unsafe_allow_html=True)
 
-                                tablas_individuales = {
-                                    "⏳ Minutos": {
-                                        "rating_col": None,
-                                        "sort_col": "% Minutos",
-                                        "columnas": [
-                                            ("Minutos Totales", False),
-                                            ("Minutos por partido", False),
-                                            ("% Minutos", True)
-                                        ]
-                                    },
-                                    "🎯 Anotación": {
-                                        "rating_col": "Rating Anotación",
-                                        "sort_col": "Rating Anotación",
-                                        "columnas": [
-                                            ("Puntos totales", False), ("Puntos por partido", False), ("Puntos p100", False),
-                                            ("%T2", True), ("2PA%", True), 
-                                            ("%T3", True), ("3PA%", True), 
-                                            ("%TL", True), ("FTr", False), 
-                                            ("eFG%", True), ("TS%", True),
-                                            ("%USG", True)
-                                        ]
-                                    },
-                                    "🛡️ Rebote": {
-                                        "rating_col": "Rating Rebote",
-                                        "sort_col": "Rating Rebote",
-                                        "columnas": [
-                                            ("RD pp", False), ("RD p100", False), ("DREB%", True),
-                                            ("RO pp", False), ("RO p100", False), ("OREB%", True),
-                                            ("RT pp", False), ("RT p100", False), ("REB%", True)
-                                        ]
-                                    },
-                                    "🧠 Cuidado de balón": {
-                                        "rating_col": "Rating Cuidado de Balón",
-                                        "sort_col": "Rating Cuidado de Balón",
-                                        "columnas": [
-                                            ("Asistencias pp", False), ("Asistencias p100", False), ("AST%", True),
-                                            ("Pérdidas pp", False), ("Pérdidas p100", False), ("TOV%", True),
-                                            ("AST / TO", False)
-                                        ]
-                                    },
-                                    "🔒 Defensa": {
-                                        "rating_col": "Rating Defensa",
-                                        "sort_col": "Rating Defensa",
-                                        "columnas": [
-                                            ("STL pp", False), ("STL p100", False), ("STL%", True),
-                                            ("BLK pp", False), ("BLK p100", False), ("BLK%", True)
-                                        ]
-                                    }
-                                }
+                                tablas_individuales = TABLAS_INDIVIDUALES
 
                                 def format_val_pct(val, pct, col_name, is_percent=False):
                                     if pd.isna(val) or pd.isna(pct) or str(val) == "" or str(pct) == "": return "-"
@@ -2363,6 +2381,15 @@ elif st.session_state.menu_principal == "Liga":
                     # ----------------------- ANÁLISIS DE QUINTETOS (ON / OFF + GRÁFICO TOTAL) -----------------------
                     elif st.session_state.sub_vista_stats == 'Análisis de Quintetos':
                         mostrar_analisis_quintetos(st.session_state.equipo_seleccionado, ultimos_n_val)
+
+                    # ----------------------- ANÁLISIS POR CUARTOS -----------------------
+                    elif st.session_state.sub_vista_stats == 'Cuartos':
+                        seccion_cuartos.mostrar_cuartos(SimpleNamespace(
+                            calcular_stats_individuales_liga=calcular_stats_individuales_liga,
+                            cargar_plantilla=cargar_plantilla,
+                            etiqueta_stat=etiqueta_stat,
+                            tablas_individuales=TABLAS_INDIVIDUALES,
+                        ), st.session_state.equipo_seleccionado, ultimos_n_val)
 
                     else:
                         st.info(f"Sección en construcción: Datos de {st.session_state.sub_vista_stats.lower()}.")
