@@ -153,6 +153,11 @@ export function rotacion(filas, duracion) {
         ${info(`${f.etiqueta} · ${enPista ? "En pista" : "Banquillo"} del ${minuto(t0)} al ${minuto(t1)} · +/- ${signo(dif, 0)}`)}/>`;
       if (enPista && t1 - t0 >= 90) {
         svg += `<text x="${x(t0) + ancho / 2}" y="${yc + 3}" text-anchor="middle" fill="#FFFFFF" font-size="8.5" pointer-events="none">${signo(dif, 0)}</text>`;
+      } else if (!enPista && t1 - t0 >= 90) {
+        // En el banquillo la barra es fina: el +/- va en color sobre ella, con un contorno del color del fondo para que se lea
+        const colorTexto = dif > 0 ? "#4ADE80" : dif < 0 ? "#F87171" : "#A3A3A3";
+        svg += `<text x="${x(t0) + ancho / 2}" y="${yc + 3}" text-anchor="middle" fill="${colorTexto}" font-size="8.5" font-weight="700"
+          paint-order="stroke" stroke="${FONDO}" stroke-width="3" pointer-events="none">${signo(dif, 0)}</text>`;
       }
     }
   });
