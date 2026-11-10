@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0B0B0B">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="2ª Nacional">
+  <title>2ª Nacional Scouting</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/png" href="icons/favicon.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="cabecera">
+    <button class="volver" id="volver" aria-label="Volver" hidden>‹</button>
+    <h1 id="titulo">2ª Nacional</h1>
+    <span class="actualizado" id="actualizado"></span>
+  </header>
+
+  <main id="vista" class="vista"><div class="cargando">Cargando…</div></main>
+
+  <nav class="barra-nav" id="nav">
+    <a href="#/clasificacion" data-seccion="clasificacion"><span class="icono">🏆</span><span>Clasificación</span></a>
+    <a href="#/partidos" data-seccion="partidos"><span class="icono">📅</span><span>Partidos</span></a>
+    <a href="#/equipos" data-seccion="equipos"><span class="icono">🛡️</span><span>Equipos</span></a>
+    <a href="#/rankings" data-seccion="rankings"><span class="icono">📊</span><span>Rankings</span></a>
+    <a href="#/propio" data-seccion="propio"><span class="icono">🏀</span><span>Atlético</span></a>
+  </nav>
+
+  <div class="aviso" id="aviso" hidden></div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
