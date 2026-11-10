@@ -1,8 +1,8 @@
 // Vistas de la liga: clasificación, partidos, equipos (stats, individuales, cuartos, plantilla), jugador y rankings.
 import { estado } from "./estado.js";
 import {
-  META, barra, cabStat, cargar, chips, claseComparada, clasePercentil, cortoEquipo, entero, esc, escudo, foto,
-  formatoPython, jugador, media, minutos, nombreEquipo, nombreJugador, nota, num, ordenDorsal, pct, pestanas, selector, signo,
+  META, barra, cabStat, cargar, chips, claseComparada, clasePercentil, cortoEquipo, entero, esPorcentaje, esc, escudo, foto,
+  formatoPython, jugador, media, minutos, nombreEquipo, nombreJugador, nota, num, ordenDorsal, pct, pestanas, selector, signo, stat,
   tabla, titulo, vacio, valorStat,
 } from "./base.js";
 import { burbujas, cartaTiro, dispersion, radar, rotacion, usoEficiencia } from "./graficos.js";
@@ -238,7 +238,7 @@ export async function partido(id, pestana = "resumen") {
         const comparable = ind.mejor !== null && !vacio(vl) && !vacio(vv) && vl !== vv;
         const mejorL = comparable && (vl > vv) === ind.mejor;
         const mejorV = comparable && !mejorL;
-        return [esc(ind.nombre),
+        return [stat(ind.nombre, ind.def),
           `<span class="${mejorL ? "verde" : ""}">${formatoPython(vl, ind.formato)}</span>`,
           `<span class="${mejorV ? "verde" : ""}">${formatoPython(vv, ind.formato)}</span>`];
       }));
@@ -283,7 +283,7 @@ export function htmlEstadistica(datos, nombre = "el equipo") {
         const [valor, posicion] = datos.estadistica[fase][ind.clave];
         const neutro = ind.mejor === null;
         const pos = vacio(posicion) ? "-" : `<span class="${!neutro && posicion === 1 ? "verde" : ""}">${posicion}º${!neutro && posicion === 1 ? " ⭐" : ""}</span>`;
-        return [esc(ind.nombre), `<b>${formatoPython(valor, ind.formato)}</b>`, pos];
+        return [stat(ind.nombre, ind.def), `<b>${formatoPython(valor, ind.formato)}</b>`, pos];
       }));
   }
   return html + nota("Toca el nombre de una columna para ver su definición.");
@@ -314,7 +314,7 @@ function htmlIndividuales(datos) {
 // ---------- Cuartos ----------
 // "1er cuarto" -> "1º", "Prórroga" -> "Prórroga"
 export const periodoCorto = (p) => p.replace(/^(\d)\D*cuarto$/, "$1º");
-const NEUTRAS = new Set(["2PA%", "3PA%"]);
+const NEUTRAS = new Set(["2PAr", "3PAr"]);
 const MENOR_ES_MEJOR = new Set(["Pérdidas pp", "Pérdidas p100", "TOV%"]);
 
 function celdaComparada(v, ref, columna, esPct) {
@@ -460,7 +460,8 @@ function barraPercentil(p) {
   return `<span class="barra ${clase}"><span class="pista"><span class="lleno" style="width:${Math.max(0, Math.min(100, p))}%;background:${COLOR_PERCENTIL[clase]}"></span></span><b>${Math.round(p)}</b></span>`;
 }
 
-export async function fichaJugador(id, pestana = "perfil") {
+// `base`: dirección de sus pestañas (la ficha se abre desde Liga y desde el Análisis Individual del Atlético)
+export async function fichaJugador(id, pestana = "perfil", base = `#/jugador/${id}`) {
   const j = jugador(id);
   const datos = j.equipo ? await cargar(`equipos/${j.equipo}.json`) : null;
   const fila = datos?.individuales.find((f) => f.id === id);
@@ -476,7 +477,7 @@ export async function fichaJugador(id, pestana = "perfil") {
   const opciones = [["perfil", "👤 Perfil"], ["impacto", "💥 Impacto"]];
   if (propio) opciones.push(["tiro", "🎯 Carta de tiro"]);
   if (etiquetado) opciones.push(["playtypes", "📋 Playtypes"], ["sistemas", "🧩 Sistemas"]);
-  html += pestanas(opciones, pestana, `#/jugador/${id}`);
+  html += pestanas(opciones, pestana, base);
 
   if (pestana === "impacto") {
     html += htmlOnOff(calcularOnOff(datos.en_pista, [id]), [id], { textoMinutos: "% del total de minutos jugados por su equipo." });
@@ -500,12 +501,12 @@ export async function fichaJugador(id, pestana = "perfil") {
   html += nota("Rol: percentil de % de minutos / 10. El resto, los ratings de 0 a 10.");
   html += titulo("Ratings (0-10)");
   html += tabla(["Categoría", "Rating"], Object.entries(fila.r).map(([c, v]) =>
-    [esc(c.replace("Rating ", "")), `<span class="estrellas">${num(v)}</span> ${"★".repeat(Math.floor((v ?? 0) / 2))}<span style="color:#525252">${"★".repeat(5 - Math.floor((v ?? 0) / 2))}</span>`]));
+    [stat(c, null, c.replace("Rating ", "")), `<span class="estrellas">${num(v)}</span> ${"★".repeat(Math.floor((v ?? 0) / 2))}<span style="color:#525252">${"★".repeat(5 - Math.floor((v ?? 0) / 2))}</span>`]));
   for (const t of META.tablas_individuales) {
     html += titulo(t.titulo);
     html += tabla(["Estadística", "Valor", "Percentil"], t.columnas.map(([c, esPct]) => {
       const [v, p] = fila.v[c];
-      return [esc(c), `<b>${valorStat(v, c, esPct)}</b>`, barraPercentil(p)];
+      return [stat(c), `<b>${valorStat(v, c, esPct)}</b>`, barraPercentil(p)];
     }));
   }
   html += nota("Percentil: posición respecto a todos los jugadores de la liga (100 = el mejor).");
@@ -513,7 +514,16 @@ export async function fichaJugador(id, pestana = "perfil") {
 }
 
 // ====================================================================== RANKINGS
-const NOMBRE_RANKING = { "2PA%": "2PAr", "3PA%": "3PAr" };
+// Barra de mínimo de minutos jugados (en total) para entrar en los tops de jugadores
+function filtroMinutos(datos) {
+  const indice = datos.stats.indexOf("Minutos Totales");
+  const maximo = Math.ceil(Math.max(...datos.jugadores.map((j) => j.v[indice] ?? 0)) / 10) * 10;
+  const minimo = Math.min(Number(estado("rk_min_minutos", "0")) || 0, maximo);
+  const html = `<div class="deslizador"><label>Mínimo de minutos jugados: <b id="rk-min-valor">${minimo}</b></label>
+    <input type="range" min="0" max="${maximo}" step="10" value="${minimo}" data-select="rk_min_minutos"
+      oninput="document.getElementById('rk-min-valor').textContent = this.value"></div>`;
+  return { html, cumple: (j) => (j.v[indice] ?? 0) >= minimo };
+}
 
 // Mapa de eficiencia de los equipos y uso vs eficiencia de los jugadores
 function graficosRanking(datos) {
@@ -531,7 +541,10 @@ function graficosRanking(datos) {
     return html + nota("El eje vertical está invertido: arriba, las mejores defensas. Las líneas marcan la media de la liga. Toca un escudo para ver sus ratings.");
   }
   const iu = datos.stats.indexOf("%USG"), ip = datos.stats.indexOf("PPP");
-  let jugadores = datos.jugadores.filter((j) => !vacio(j.v[iu]) && !vacio(j.v[ip])).map((j) => ({ id: j.id, eq: j.eq, usg: j.v[iu], ppp: j.v[ip] }));
+  const minutosJugados = filtroMinutos(datos);
+  html += minutosJugados.html;
+  let jugadores = datos.jugadores.filter((j) => !vacio(j.v[iu]) && !vacio(j.v[ip]) && minutosJugados.cumple(j))
+    .map((j) => ({ id: j.id, eq: j.eq, usg: j.v[iu], ppp: j.v[ip] }));
   const filtro = estado("rk_uso", "uso10", ["uso10", "uso20", "efi10", "efi20", "todos", "equipo"]);
   html += chips("rk_uso", [["uso10", "Top 10 uso"], ["uso20", "Top 20 uso"], ["efi10", "Top 10 eficiencia"], ["efi20", "Top 20 eficiencia"], ["todos", "Todos"], ["equipo", "Por equipo"]], filtro);
   if (filtro === "equipo") {
@@ -553,12 +566,11 @@ export async function rankings() {
   const apartado = estado(`rk_apartado_${tipo}`, Object.keys(grupos)[individual ? 2 : 0], Object.keys(grupos));
   const stats = grupos[apartado];
   const stat = estado(`rk_stat_${tipo}_${apartado}`, stats[0], stats);
-  const nombreStat = (s) => NOMBRE_RANKING[s] ?? s;
 
   let html = chips("rk_tipo", [["Individual", "👤 Jugadores"], ["Equipo", "🛡️ Equipos"], ["Grafico", "📈 Gráficos"]], tipo);
   if (tipo === "Grafico") return { titulo: "Rankings", html: html + graficosRanking(datos) };
   html += `<div class="fila-selects">${selector(`rk_apartado_${tipo}`, Object.keys(grupos).map((g) => [g, g]), apartado)}
-    ${selector(`rk_stat_${tipo}_${apartado}`, stats.map((s) => [s, nombreStat(s)]), stat)}</div>`;
+    ${selector(`rk_stat_${tipo}_${apartado}`, stats.map((s) => [s, s]), stat)}</div>`;
   const def = individual ? META.def_jugador?.[stat] ?? META.def_equipo?.[stat] : META.def_equipo?.[stat];
   if (def) html += nota(esc(def));
 
@@ -569,6 +581,9 @@ export async function rankings() {
     const equipo = estado("rk_equipo", "todos");
     html += selector("rk_equipo", [["todos", "Todos los equipos"], ...META.lista_equipos.map((e) => [String(e.id), e.nombre])], equipo);
     if (equipo !== "todos") filas = filas.filter((f) => f.eq === Number(equipo));
+    const minutosJugados = filtroMinutos(datos);
+    html += minutosJugados.html;
+    filas = filas.filter(minutosJugados.cumple);
   }
   filas.sort((a, b) => (ascendente ? a.v[indice] - b.v[indice] : b.v[indice] - a.v[indice]));
   const top = estado("rk_top", "25", ["25", "50", "todos"]);
@@ -576,8 +591,8 @@ export async function rankings() {
     html += chips("rk_top", [["25", "Top 25"], ["50", "Top 50"], ["todos", "Todos"]], top);
     if (top !== "todos") filas = filas.slice(0, Number(top));
   }
-  const esPct = /%/.test(stat);
-  html += tabla([individual ? "Jugador" : "Equipo", ...(individual ? ["Eq."] : []), nombreStat(stat)], filas.map((f, i) => ({
+  const esPct = esPorcentaje(stat);
+  html += tabla([individual ? "Jugador" : "Equipo", ...(individual ? ["Eq."] : []), cabStat(stat, individual)], filas.map((f, i) => ({
     celdas: [individual ? `<span class="pos">${i + 1}</span> ${esc(jugador(f.id).nombre)}`
       : `<span class="equipo-celda"><span class="pos">${i + 1}</span>${escudo(f.eq, 22)}${esc(nombreEquipo(f.eq))}</span>`,
       ...(individual ? [`<span class="equipo-celda">${escudo(f.eq, 18)}${esc(cortoEquipo(f.eq))}</span>`] : []),

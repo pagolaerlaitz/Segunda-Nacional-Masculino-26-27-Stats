@@ -66,6 +66,9 @@ export function valorStat(v, nombre, esPorcentaje) {
   return Number.isInteger(v) ? String(v) : num(v);
 }
 
+// Si el valor se muestra con %: 2PAr y 3PAr son porcentajes aunque su nombre no lleve %
+export const esPorcentaje = (nombre) => nombre.includes("%") || nombre === "2PAr" || nombre === "3PAr";
+
 export function minutos(segundos) {
   if (!segundos) return "0";
   const s = Math.round(segundos);
@@ -129,6 +132,12 @@ export function pestanas(opciones, activa, base) {
     `<a class="pestana${clave === activa ? " activa" : ""}" href="${base}/${encodeURIComponent(clave)}">${texto}</a>`).join("")}</div>`;
 }
 
+// Segundo nivel de pestañas (por ejemplo, las de Ataque y Defensa del Atlético)
+export function subpestanas(opciones, activa, base) {
+  return `<div class="chips subpestanas">${opciones.map(([clave, texto]) =>
+    `<a class="chip${clave === activa ? " activa" : ""}" href="${base}/${encodeURIComponent(clave)}">${texto}</a>`).join("")}</div>`;
+}
+
 // Chips que cambian un estado de la vista (data-chip="grupo:valor")
 export function chips(grupo, opciones, activa) {
   return `<div class="chips">${opciones.map(([valor, texto]) =>
@@ -177,6 +186,13 @@ export function foto(id, tam = 44) {
 export function definicion(nombre, deJugador = false) {
   const defs = deJugador ? META.def_jugador : META.def_equipo;
   return defs?.[nombre] ?? (deJugador ? META.def_equipo?.[nombre] : null) ?? null;
+}
+
+// Nombre de una estadística que muestra su definición al tocarlo (para filas de tablas y textos)
+export function stat(nombre, def = null, texto = null) {
+  const definicionStat = def ?? definicion(nombre, true);
+  const visible = esc(texto ?? nombre);
+  return definicionStat ? `<span class="con-def" data-def="${esc(definicionStat)}" data-nombre="${esc(nombre)}">${visible}</span>` : visible;
 }
 
 export function cabStat(nombre, deJugador = true, texto = null) {

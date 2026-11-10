@@ -12,7 +12,7 @@ const RUTAS = {
   equipo: ([id, pestana]) => liga.equipo(Number(id), pestana),
   jugador: ([id, pestana]) => liga.fichaJugador(Number(id), pestana),
   rankings: () => liga.rankings(),
-  propio: ([pestana]) => propio.propio(pestana),
+  propio: ([apartado, sub, extra]) => propio.propio(apartado, sub, extra),
 };
 // Sección de la barra inferior a la que pertenece cada ruta
 const SECCION = { partido: "partidos", equipo: "equipos", jugador: "equipos" };
@@ -63,9 +63,10 @@ function mostrarAviso(html) {
 }
 
 document.addEventListener("click", (evento) => {
-  const cabecera = evento.target.closest("th[data-def]");
-  if (cabecera) {
-    mostrarAviso(`<b>${esc(cabecera.dataset.nombre)}</b>: ${esc(cabecera.dataset.def)}`);
+  // Definición de una estadística (cabeceras de tabla y nombres de estadística en filas)
+  const conDefinicion = evento.target.closest("[data-def]");
+  if (conDefinicion) {
+    mostrarAviso(`<b>${esc(conDefinicion.dataset.nombre)}</b>: ${esc(conDefinicion.dataset.def)}`);
     return;
   }
   // Detalle de un elemento de un gráfico (punto, barra, zona de tiro...)

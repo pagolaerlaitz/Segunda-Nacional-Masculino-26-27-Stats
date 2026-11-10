@@ -24,7 +24,7 @@ POR_PARTIDO = {"Minutos por partido": "Minutos Totales", "Puntos por partido": "
                "STL pp": "Recuperaciones", "BLK pp": "Tapones"}
 ACUMULADAS = set(POR_PARTIDO) | {"Minutos Totales", "Puntos totales"}
 MENOR_ES_MEJOR = {"Pérdidas pp", "Pérdidas p100", "TOV%"}
-NEUTRAS = {"2PA%", "3PA%"}  # describen el tipo de tiro, no son mejores ni peores
+NEUTRAS = {"2PAr", "3PAr"}  # describen el tipo de tiro, no son mejores ni peores
 MINUTOS_PRORROGA = 5
 
 

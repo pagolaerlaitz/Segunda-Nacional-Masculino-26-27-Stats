@@ -97,6 +97,8 @@ button { font: inherit; color: inherit; }
 .pestana.activa, .chip.activa { background: var(--naranja); border-color: var(--naranja); color: #000; }
 .chips { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; margin: 6px 0 12px; }
 .chip { padding: 5px 12px; font-size: 0.8rem; }
+.subpestanas { margin-top: 0; padding-bottom: 6px; border-bottom: 1px solid var(--borde); margin-bottom: 12px; }
+a.chip { display: inline-block; }
 
 select {
   width: 100%; background: var(--panel); color: var(--texto); border: 1px solid var(--borde); border-radius: 10px;
@@ -125,10 +127,11 @@ select {
 table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
 th, td { padding: 9px 8px; text-align: center; white-space: nowrap; border-bottom: 1px solid var(--borde); }
 th {
-  background: var(--panel-2); color: var(--texto-2); font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
-  letter-spacing: 0.3px; position: sticky; top: 0;
+  /* Sin mayúsculas: los nombres de las estadísticas (2PAr, FTr, eFG%...) se leen tal cual */
+  background: var(--panel-2); color: var(--texto-2); font-size: 0.72rem; font-weight: 700;
+  letter-spacing: 0.2px; position: sticky; top: 0;
 }
-th[data-def] { text-decoration: underline dotted var(--texto-4); text-underline-offset: 3px; cursor: help; }
+th[data-def], .con-def { text-decoration: underline dotted var(--texto-4); text-underline-offset: 3px; cursor: help; }
 tr:last-child td { border-bottom: none; }
 tbody tr:nth-child(even) td { background: rgba(255, 255, 255, 0.025); }
 td:first-child, th:first-child {
@@ -153,6 +156,12 @@ tr.padre td:first-child { color: var(--naranja); }
 .barra { display: inline-flex; align-items: center; gap: 6px; }
 .barra .pista { width: 46px; height: 6px; background: rgba(255, 255, 255, 0.1); border-radius: 3px; overflow: hidden; }
 .barra .lleno { height: 100%; background: var(--naranja); border-radius: 3px; }
+
+/* Barra deslizante (mínimo de minutos) */
+.deslizador { background: var(--panel); border: 1px solid var(--borde); border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; }
+.deslizador label { display: block; font-size: 0.85rem; color: var(--texto-2); margin-bottom: 6px; }
+.deslizador b { color: var(--naranja); }
+.deslizador input { width: 100%; accent-color: var(--naranja); }
 
 /* ---------- Clasificación ---------- */
 .clasif td:first-child { min-width: 170px; max-width: 200px; white-space: normal; font-size: 0.78rem; line-height: 1.2; }
@@ -192,7 +201,8 @@ tr.padre td:first-child { color: var(--naranja); }
 .cabecera-equipo { display: flex; align-items: center; gap: 14px; padding: 6px 0 4px; }
 .cabecera-equipo h2 { margin: 0; font-size: 1.15rem; text-transform: uppercase; overflow-wrap: anywhere; }
 .cabecera-equipo > div { min-width: 0; }
-.vista { overflow-x: hidden; }
+/* clip y no hidden: hidden convierte la vista en contenedor de scroll y descoloca las pestañas fijas (sticky) */
+.vista { overflow-x: clip; }
 .lista-jugadores .jugador {
   display: flex; align-items: center; gap: 12px; padding: 10px 12px; background: var(--panel);
   border: 1px solid var(--borde); border-radius: 12px; margin-bottom: 6px;

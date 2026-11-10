@@ -79,8 +79,6 @@ DEFINICIONES_STATS = {
     'eFG%': "Tiro de campo efectivo: como el % de tiro, pero el triple vale 1,5 veces un tiro de 2.",
     'TS%': "Tiro verdadero: eficiencia anotadora incluyendo triples y tiros libres.",
     'FTr': "Tiros libres intentados por cada tiro de campo intentado.",
-    '2PA%': "Porcentaje de los tiros de campo que son de 2.",
-    '3PA%': "Porcentaje de los tiros de campo que son triples.",
     '2PAr': "Porcentaje de los tiros de campo que son de 2.",
     '3PAr': "Porcentaje de los tiros de campo que son triples.",
     'DREB%': "Porcentaje de los rebotes defensivos disponibles que se capturan.",
@@ -90,6 +88,11 @@ DEFINICIONES_STATS = {
     'AST / TO ratio': "Asistencias por cada pérdida.",
     'AST%': "Porcentaje de las canastas de campo que llegan tras una asistencia.",
 }
+
+def es_porcentaje(nombre_stat):
+    """Si el valor de la estadística se muestra con %. 2PAr y 3PAr son porcentajes aunque su nombre no lleve %."""
+    return '%' in nombre_stat or nombre_stat in ('2PAr', '3PAr')
+
 
 # Definiciones individuales: amplían o sustituyen a las de equipo cuando el significado cambia
 DEFINICIONES_STATS_JUGADOR = {
@@ -105,8 +108,6 @@ DEFINICIONES_STATS_JUGADOR = {
     'Puntos totales': "Puntos anotados en total.",
     'Puntos por partido': "Puntos anotados por partido disputado.",
     'Puntos p100': "Puntos anotados por cada 100 posesiones de su equipo con él en pista.",
-    '2PA%': "Porcentaje de sus tiros de campo que son de 2.",
-    '3PA%': "Porcentaje de sus tiros de campo que son triples.",
     '2PAr': "Porcentaje de sus tiros de campo que son de 2.",
     '3PAr': "Porcentaje de sus tiros de campo que son triples.",
     '%USG': "Uso: porcentaje de las posesiones de su equipo, con él en pista, que termina él (tiro, tiros libres o pérdida).",
@@ -383,8 +384,8 @@ def calcular_stats_avanzadas_liga(ultimos_n=None):
         df['eFG%'] = (((df['FGM'] + 0.5 * df['T3_anotados']) / df['FGA'].replace(0,pd.NA)) * 100).round(1)
         df['TS%'] = ((df['Puntos'] / (2 * (df['FGA'] + 0.44 * df['TL_intentados'])).replace(0,pd.NA)) * 100).round(1)
         df['FTr'] = (df['TL_intentados'] / df['FGA'].replace(0,pd.NA)).round(3)
-        df['2PA%'] = ((df['T2_intentados'] / df['FGA'].replace(0,pd.NA)) * 100).round(1)
-        df['3PA%'] = ((df['T3_intentados'] / df['FGA'].replace(0,pd.NA)) * 100).round(1)
+        df['2PAr'] = ((df['T2_intentados'] / df['FGA'].replace(0,pd.NA)) * 100).round(1)
+        df['3PAr'] = ((df['T3_intentados'] / df['FGA'].replace(0,pd.NA)) * 100).round(1)
         df['DREB%'] = ((df['DREB'] / (df['DREB'] + df['opp_OREB']).replace(0,pd.NA)) * 100).round(1)
         df['OREB%'] = ((df['OREB'] / (df['OREB'] + df['opp_DREB']).replace(0,pd.NA)) * 100).round(1)
         df['REB%'] = ((df['REB'] / (df['REB'] + df['opp_REB']).replace(0,pd.NA)) * 100).round(1)
@@ -393,7 +394,7 @@ def calcular_stats_avanzadas_liga(ultimos_n=None):
         df['AST%'] = ((df['Asistencias'] / df['FGM'].replace(0,pd.NA)) * 100).round(1)
 
         invertir_rank = ['Defensive Rating', 'TOV%']
-        categorias = ['Ritmo', 'Plays', 'Offensive Rating', 'Defensive Rating', 'Net Rating', 'eFG%', 'TS%', 'FTr', '2PA%', '3PA%', 'DREB%', 'OREB%', 'REB%', 'TOV%', 'AST / TO ratio', 'AST%']
+        categorias = ['Ritmo', 'Plays', 'Offensive Rating', 'Defensive Rating', 'Net Rating', 'eFG%', 'TS%', 'FTr', '2PAr', '3PAr', 'DREB%', 'OREB%', 'REB%', 'TOV%', 'AST / TO ratio', 'AST%']
         
         for col in categorias:
             if col in df.columns:
@@ -586,9 +587,9 @@ def calcular_stats_individuales_liga(ultimos_n=None, periodo=None):
         df_final['Puntos p100'] = (df_final['Puntos totales'] / team_poss_on_safe) * 100
 
         df_final['%T2'] = (df_final['T2_anotados'] / df_final['T2_intentados'].replace(0, pd.NA)) * 100
-        df_final['2PA%'] = (df_final['T2_intentados'] / df_final['FGA'].replace(0, pd.NA)) * 100
+        df_final['2PAr'] = (df_final['T2_intentados'] / df_final['FGA'].replace(0, pd.NA)) * 100
         df_final['%T3'] = (df_final['T3_anotados'] / df_final['T3_intentados'].replace(0, pd.NA)) * 100
-        df_final['3PA%'] = (df_final['T3_intentados'] / df_final['FGA'].replace(0, pd.NA)) * 100
+        df_final['3PAr'] = (df_final['T3_intentados'] / df_final['FGA'].replace(0, pd.NA)) * 100
         df_final['%TL'] = (df_final['TL_anotados'] / df_final['TL_intentados'].replace(0, pd.NA)) * 100
         df_final['FTr'] = df_final['FTA'] / df_final['FGA'].replace(0, pd.NA)
         
@@ -664,8 +665,8 @@ def calcular_stats_individuales_liga(ultimos_n=None, periodo=None):
         # 6. PERCENTILES DE LIGA
         metrics_higher_better = [
             'Minutos Totales', 'Minutos por partido', '% Minutos',
-            'Puntos totales', 'Puntos por partido', 'Puntos p100', '%T2', '2PA%',
-            '%T3', '3PA%', '%TL', 'FTr', 'eFG%', 'TS%', '%USG', 'PPP',
+            'Puntos totales', 'Puntos por partido', 'Puntos p100', '%T2', '2PAr',
+            '%T3', '3PAr', '%TL', 'FTr', 'eFG%', 'TS%', '%USG', 'PPP',
             'RD pp', 'RD p100', 'DREB%', 'RO pp', 'RO p100', 'OREB%', 'RT pp', 'RT p100', 'REB%',
             'Asistencias pp', 'Asistencias p100', 'AST%', 'AST / TO',
             'STL pp', 'STL p100', 'STL%', 'BLK pp', 'BLK p100', 'BLK%'
@@ -712,8 +713,8 @@ TABLAS_INDIVIDUALES = {
         "sort_col": "Rating Anotación",
         "columnas": [
             ("Puntos totales", False), ("Puntos por partido", False), ("Puntos p100", False),
-            ("%T2", True), ("2PA%", True),
-            ("%T3", True), ("3PA%", True),
+            ("%T2", True), ("2PAr", True),
+            ("%T3", True), ("3PAr", True),
             ("%TL", True), ("FTr", False),
             ("eFG%", True), ("TS%", True),
             ("%USG", True)
@@ -863,8 +864,8 @@ def calcular_stats_quinteto(id_equipo, lista_ids_jugadores, ultimos_n=None):
                 'eFG%': round(((FGM + 0.5 * T3_anotados) / div_FGA) * 100, 1),
                 'TS%': round((Puntos / div_TS) * 100, 1),
                 'FTr': round(TL_intentados / div_FGA, 3),
-                '2PA%': round((T2_intentados / div_FGA) * 100, 1),
-                '3PA%': round((T3_intentados / div_FGA) * 100, 1),
+                '2PAr': round((T2_intentados / div_FGA) * 100, 1),
+                '3PAr': round((T3_intentados / div_FGA) * 100, 1),
                 'DREB%': round((DREB / div_DREB) * 100, 1),
                 'OREB%': round((OREB / div_OREB) * 100, 1),
                 'REB%': round((REB / div_REB) * 100, 1),
@@ -1074,8 +1075,8 @@ def mostrar_perfil_jugador(id_jugador, ultimos_n=None):
                     "rating_col": "Rating Anotación",
                     "columnas": [
                         ("Puntos totales", False), ("Puntos por partido", False), ("Puntos p100", False),
-                        ("%T2", True), ("2PA%", True), 
-                        ("%T3", True), ("3PA%", True), 
+                        ("%T2", True), ("2PAr", True), 
+                        ("%T3", True), ("3PAr", True), 
                         ("%TL", True), ("FTr", False), 
                         ("eFG%", True), ("TS%", True),
                         ("%USG", True), ("PPP", False)
@@ -1266,7 +1267,7 @@ def mostrar_impacto_jugador(id_jugador, id_equipo, ultimos_n=None):
 
         bloques_avanzados_q = {
             "Eficiencia Ofensiva / Defensiva": ['Offensive Rating', 'Defensive Rating', 'Net Rating'],
-            "Tiro": ['eFG%', 'TS%', 'FTr', '2PA%', '3PA%'],
+            "Tiro": ['eFG%', 'TS%', 'FTr', '2PAr', '3PAr'],
             "Rebote": ['DREB%', 'OREB%', 'REB%'],
             "Cuidado de balón": ['TOV%', 'AST / TO ratio', 'AST%']
         }
@@ -1290,14 +1291,14 @@ def mostrar_impacto_jugador(id_jugador, id_equipo, ultimos_n=None):
                             c_diff = "#4CAF50" if diff_val > 0 else "#F87171"
 
                         diff_str = f"+{diff_val:.1f}" if diff_val > 0 else f"{diff_val:.1f}"
-                        if '%' in cat: diff_str += "%"
+                        if es_porcentaje(cat): diff_str += "%"
                         diff_html = f"<span style='color: {c_diff}; font-weight: bold;'>{diff_str}</span>"
                     except: pass
 
                 def fmt(v, c):
                     if v is None: return "-"
                     s = str(v)
-                    if '%' in c: return s + "%"
+                    if es_porcentaje(c): return s + "%"
                     if c == 'Net Rating' and float(v) > 0: return "+" + s
                     return s
 
@@ -1417,7 +1418,7 @@ def mostrar_analisis_quintetos(id_equipo, ultimos_n=None):
 
                 bloques_avanzados_q = {
                     "Eficiencia Ofensiva / Defensiva": ['Offensive Rating', 'Defensive Rating', 'Net Rating'],
-                    "Tiro": ['eFG%', 'TS%', 'FTr', '2PA%', '3PA%'],
+                    "Tiro": ['eFG%', 'TS%', 'FTr', '2PAr', '3PAr'],
                     "Rebote": ['DREB%', 'OREB%', 'REB%'],
                     "Cuidado de balón": ['TOV%', 'AST / TO ratio', 'AST%']
                 }
@@ -1452,7 +1453,7 @@ def mostrar_analisis_quintetos(id_equipo, ultimos_n=None):
                             if not dict_stats: return "-"
                             val = dict_stats.get(categoria, "-")
                             if val == "-": return "-"
-                            if '%' in categoria: return f"{val}%"
+                            if es_porcentaje(categoria): return f"{val}%"
                             if categoria == 'Net Rating' and float(val) > 0: return f"+{val}"
                             return str(val)
 
@@ -1692,6 +1693,7 @@ def mostrar_portada():
                 unsafe_allow_html=True)
 
 
+# ==== INTERFAZ ==== (lo de arriba son datos y cálculos; exportar_movil.py lo carga sin dibujar la app)
 if st.session_state.menu_principal not in ("Inicio", "Propio", "Liga", "Clasificación", "Partidos"):
     st.session_state.menu_principal = "Inicio"  # sesiones antiguas que estaban en secciones eliminadas
 
@@ -1779,8 +1781,6 @@ elif st.session_state.menu_principal == "Liga":
             "Rebote": ['DREB%', 'OREB%', 'REB%'],
             "Cuidado de balón": ['TOV%', 'AST / TO ratio', 'AST%']
         }
-        # En Rankings, 2PAr y 3PAr son los nombres que se muestran de las columnas 2PA% y 3PA%
-        COLUMNA_RANKING = {'2PAr': '2PA%', '3PAr': '3PA%'}
         
         stat_seleccionada = None
         grafico_seleccionado = None
@@ -1833,7 +1833,16 @@ elif st.session_state.menu_principal == "Liga":
                     eq_nombres = df_eq_options['nombre'].tolist()
                     with col_f2:
                         equipo_filtro_grafico = st.selectbox("Selecciona equipo para gráfico", eq_nombres, label_visibility="collapsed")
-        
+
+        # Mínimo de minutos jugados (en total) para entrar en los tops de jugadores
+        minimo_minutos = 0
+        if tipo_stat == "Individual" or (tipo_stat == "Gráfico" and grafico_seleccionado == "Uso vs Eficiencia (%USG vs PPP)"):
+            df_minutos = calcular_stats_individuales_liga()
+            max_minutos = int(np.ceil(df_minutos['Minutos Totales'].max() / 10) * 10) if not df_minutos.empty else 0
+            if max_minutos > 0:
+                minimo_minutos = st.slider("Mínimo de minutos jugados", 0, max_minutos, 0, step=10, key="ranking_min_minutos",
+                                           help="Solo entran en el ranking los jugadores con al menos esos minutos en total.")
+
         st.markdown("</div>", unsafe_allow_html=True)
         
         def format_stat_value(val, stat_name):
@@ -1947,7 +1956,8 @@ elif st.session_state.menu_principal == "Liga":
                     df_res = df_res.merge(df_eq_nombres, on="id_equipo", how="inner")
                     
                     df_res = df_res.dropna(subset=['%USG', 'PPP'])
-                    
+                    df_res = df_res[df_res['Minutos Totales'] >= minimo_minutos]
+
                     if filtro_rango_grafico == "Por Equipo" and equipo_filtro_grafico:
                         conn = sqlite3.connect("mi_liga.db")
                         eq_selec_id = pd.read_sql("SELECT id_equipo FROM equipos WHERE nombre = ?", conn, params=(equipo_filtro_grafico,))
@@ -1977,7 +1987,8 @@ elif st.session_state.menu_principal == "Liga":
                 
                 df_res = df_indiv.merge(df_jug_nombres, on="id_jugador", how="inner")
                 df_res = df_res.merge(df_eq_nombres, on="id_equipo", how="inner")
-                
+                df_res = df_res[df_res['Minutos Totales'] >= minimo_minutos]
+
                 if filtro_rango == "Por Equipo" and equipo_filtro:
                     conn = sqlite3.connect("mi_liga.db")
                     eq_selec_id = pd.read_sql("SELECT id_equipo FROM equipos WHERE nombre = ?", conn, params=(equipo_filtro,))
@@ -1986,7 +1997,7 @@ elif st.session_state.menu_principal == "Liga":
                         df_res = df_res[df_res['id_equipo'] == eq_selec_id.iloc[0]['id_equipo']]
                 
                 ascendente = True if stat_seleccionada in ['Pérdidas pp', 'Pérdidas p100', 'TOV%', 'Diferencial Defensive Rating'] else False
-                df_res = df_res.sort_values(by=COLUMNA_RANKING.get(stat_seleccionada, stat_seleccionada), ascending=ascendente)
+                df_res = df_res.sort_values(by=stat_seleccionada, ascending=ascendente)
 
                 if filtro_rango == "Top 10": df_res = df_res.head(10)
                 elif filtro_rango == "Top 50": df_res = df_res.head(50)
@@ -2007,7 +2018,7 @@ elif st.session_state.menu_principal == "Liga":
                     
                     jug_name = f"<a href='{enlace}' target='_self' style='color: #FFFFFF; text-decoration: none; transition: color 0.2s;' onmouseover=\"this.style.color='#F97316'\" onmouseout=\"this.style.color='#FFFFFF'\">{row['Jugador']}</a>"
                     
-                    val_str = format_stat_value(row.get(COLUMNA_RANKING.get(stat_seleccionada, stat_seleccionada)), stat_seleccionada)
+                    val_str = format_stat_value(row.get(stat_seleccionada), stat_seleccionada)
                     
                     tds = f"<td style='padding: 12px 15px; border-bottom: 1px solid rgba(255,255,255,0.2); color: #F97316; font-weight: bold; text-align: center;'>{idx + 1}</td>" \
                           f"<td style='padding: 12px 15px; border-bottom: 1px solid rgba(255,255,255,0.2); font-weight: bold;'>{jug_name}</td>" \
@@ -2041,7 +2052,7 @@ elif st.session_state.menu_principal == "Liga":
                 df_res = df_eq_stats.merge(df_eq_nombres, on="id_equipo", how="inner")
                 
                 ascendente = True if stat_seleccionada in ['Defensive Rating', 'TOV%'] else False
-                df_res = df_res.sort_values(by=COLUMNA_RANKING.get(stat_seleccionada, stat_seleccionada), ascending=ascendente)
+                df_res = df_res.sort_values(by=stat_seleccionada, ascending=ascendente)
                 
                 ths = f"<th style='padding: 12px 15px; border-bottom: 2px solid #F97316; width: 10%; text-align: center;'># Rank</th>" \
                       f"<th style='padding: 12px 15px; border-bottom: 2px solid #F97316; width: 50%;'>Equipo</th>" \
@@ -2051,7 +2062,7 @@ elif st.session_state.menu_principal == "Liga":
                 for idx, (i, row) in enumerate(df_res.iterrows()):
                     bg_color = "transparent" if idx % 2 == 0 else "rgba(255, 255, 255, 0.05)"
                     
-                    val_str = format_stat_value(row.get(COLUMNA_RANKING.get(stat_seleccionada, stat_seleccionada)), stat_seleccionada)
+                    val_str = format_stat_value(row.get(stat_seleccionada), stat_seleccionada)
                     
                     tds = f"<td style='padding: 12px 15px; border-bottom: 1px solid rgba(255,255,255,0.2); color: #F97316; font-weight: bold; text-align: center;'>{idx + 1}</td>" \
                           f"<td style='padding: 12px 15px; border-bottom: 1px solid rgba(255,255,255,0.2); color: #FFFFFF; font-weight: bold;'>{row['nombre']}</td>" \

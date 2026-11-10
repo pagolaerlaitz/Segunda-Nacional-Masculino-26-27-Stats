@@ -1,6 +1,6 @@
 // Impacto On/Off de una combinación de jugadores (como calcular_stats_quinteto de app.py), calculado en el móvil
 // a partir del play by play mínimo de cada equipo: [quinteto en pista, lado (1 propio, 0 rival, -1 nadie), jugada, segundos].
-import { esc, nombreJugador, num, tabla, titulo, vacio } from "./base.js";
+import { META, esPorcentaje, nombreJugador, num, stat as nombreStat, tabla, titulo, vacio } from "./base.js";
 import { barrasH } from "./graficos.js";
 
 const CONTADORES = ["fgm", "t3m", "fga", "t2a", "t3a", "tlm", "tla", "dreb", "oreb", "ast", "tov"];
@@ -43,7 +43,7 @@ function metricas(a) {
     "Offensive Rating": ortg, "Defensive Rating": drtg, "Net Rating": ortg - drtg,
     "eFG%": ((p.fgm + 0.5 * p.t3m) / div(p.fga)) * 100,
     "TS%": (puntos / div(2 * (p.fga + 0.44 * p.tla))) * 100,
-    "FTr": p.tla / div(p.fga), "2PA%": (p.t2a / div(p.fga)) * 100, "3PA%": (p.t3a / div(p.fga)) * 100,
+    "FTr": p.tla / div(p.fga), "2PAr": (p.t2a / div(p.fga)) * 100, "3PAr": (p.t3a / div(p.fga)) * 100,
     "DREB%": (p.dreb / div(p.dreb + r.oreb)) * 100, "OREB%": (p.oreb / div(p.oreb + r.dreb)) * 100,
     "REB%": (reb / div(reb + rebRival)) * 100, "TOV%": (p.tov / posesiones) * 100,
     "AST / TO ratio": p.ast / div(p.tov), "AST%": (p.ast / div(p.fgm)) * 100,
@@ -73,7 +73,7 @@ export function calcularOnOff(enPista, ids) {
 
 const BLOQUES = {
   "Eficiencia ofensiva / defensiva": ["Offensive Rating", "Defensive Rating", "Net Rating"],
-  "Tiro": ["eFG%", "TS%", "FTr", "2PA%", "3PA%"],
+  "Tiro": ["eFG%", "TS%", "FTr", "2PAr", "3PAr"],
   "Rebote": ["DREB%", "OREB%", "REB%"],
   "Cuidado de balón": ["TOV%", "AST / TO ratio", "AST%"],
 };
@@ -83,7 +83,7 @@ function formato(v, stat) {
   if (vacio(v)) return "-";
   if (stat === "FTr") return num(v, 3);
   if (stat === "AST / TO ratio") return num(v, 2);
-  if (stat.includes("%")) return `${num(v)}%`;
+  if (esPorcentaje(stat)) return `${num(v)}%`;
   if (stat === "Net Rating" && v > 0) return `+${num(v)}`;
   return num(v);
 }
@@ -106,8 +106,8 @@ export function htmlOnOff(datos, ids, { textoMinutos, conDiferencial = true }) {
       const mejor = comparable && ((on > off) !== MENOR_ES_MEJOR.includes(stat));
       const claseOn = comparable ? (mejor ? "verde" : "rojo") : "";
       const dif = comparable ? on - off : NaN;
-      const difTexto = vacio(dif) ? "-" : `${dif > 0 ? "+" : ""}${stat === "FTr" ? num(dif, 3) : stat === "AST / TO ratio" ? num(dif, 2) : num(dif)}${stat.includes("%") ? "%" : ""}`;
-      return [esc(stat), `<span class="${claseOn}">${formato(on, stat)}</span>`, `<span class="neutro">${formato(off, stat)}</span>`,
+      const difTexto = vacio(dif) ? "-" : `${dif > 0 ? "+" : ""}${stat === "FTr" ? num(dif, 3) : stat === "AST / TO ratio" ? num(dif, 2) : num(dif)}${esPorcentaje(stat) ? "%" : ""}`;
+      return [nombreStat(stat, META.def_equipo?.[stat]), `<span class="${claseOn}">${formato(on, stat)}</span>`, `<span class="neutro">${formato(off, stat)}</span>`,
         ...(conDiferencial ? [`<span class="${claseOn}">${difTexto}</span>`] : []), `<span class="media">${formato(datos.media[stat], stat)}</span>`];
     }));
   }
