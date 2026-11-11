@@ -110,6 +110,7 @@ DEFINICIONES_STATS_JUGADOR = {
     'Puntos p100': "Puntos anotados por cada 100 posesiones de su equipo con él en pista.",
     '2PAr': "Porcentaje de sus tiros de campo que son de 2.",
     '3PAr': "Porcentaje de sus tiros de campo que son triples.",
+    'ASTFGM%': "Porcentaje de sus canastas de campo que llegan tras una asistencia. Alto = anota sobre todo recibiendo pases; bajo = se crea él sus canastas.",
     '%USG': "Uso: porcentaje de las posesiones de su equipo, con él en pista, que termina él (tiro, tiros libres o pérdida).",
     'PPP': "Puntos por cada posesión que termina él.",
     'RD pp': "Rebotes defensivos por partido.",
@@ -404,6 +405,35 @@ def calcular_stats_avanzadas_liga(ultimos_n=None):
     except Exception as e:
         return pd.DataFrame()
 
+def canastas_asistidas(df):
+    """1 en las canastas de campo que llegan tras asistencia. df: play by play ordenado (id_partido, orden) con
+    id_equipo, idMove, min y sec. La federación apunta la asistencia justo después de la canasta (o tras la falta
+    y el tiro libre en un 2+1): se busca hacia atrás la canasta del mismo equipo en el mismo segundo y, si no la hay,
+    se acepta la acción inmediatamente anterior si es una canasta del mismo equipo (a veces el reloj va unos
+    segundos desfasado). Las asistencias a tiros libres no corresponden a ninguna canasta de campo."""
+    partido, equipo, jugada = df['id_partido'].to_numpy(), df['id_equipo'].to_numpy(), df['idMove'].to_numpy()
+    tiempo = (df['min'].fillna(0) * 60 + df['sec'].fillna(0)).to_numpy()
+    canasta = np.isin(jugada, [93, 100, 94])
+    asistida = np.zeros(len(df), dtype=int)
+    for i in np.flatnonzero(jugada == 107):
+        elegida = None
+        for j in range(i - 1, max(-1, i - 6), -1):
+            if partido[j] != partido[i]:
+                break
+            if canasta[j] and equipo[j] == equipo[i] and tiempo[j] == tiempo[i] and not asistida[j]:
+                elegida = j
+                break
+        if elegida is None:
+            j = i - 1
+            while j >= 0 and partido[j] == partido[i] and jugada[j] in (112, 113, 115):  # cambios y tiempos muertos
+                j -= 1
+            if j >= 0 and partido[j] == partido[i] and canasta[j] and equipo[j] == equipo[i] and not asistida[j]:
+                elegida = j
+        if elegida is not None:
+            asistida[elegida] = 1
+    return asistida
+
+
 @st.cache_data
 def calcular_stats_individuales_liga(ultimos_n=None, periodo=None):
     """`periodo`: None (partido completo), 1-4 (un cuarto) u "OT" (prórrogas)."""
@@ -433,8 +463,10 @@ def calcular_stats_individuales_liga(ultimos_n=None, periodo=None):
         df_valid = pd.read_sql(query_valid, conexion)
 
         # 2. Volumen Base (Individual)
-        query_pbp = f"SELECT pb.id_partido, pb.id_equipo, pb.id_jugador, pb.idMove FROM play_by_play pb WHERE pb.id_jugador IS NOT NULL {filtro_periodo}"
+        query_pbp = f"""SELECT pb.id_partido, pb.id_equipo, pb.id_jugador, pb.idMove, pb.min, pb.sec FROM play_by_play pb
+                        WHERE pb.id_jugador IS NOT NULL {filtro_periodo} ORDER BY pb.id_partido, pb.rowid"""
         df_pbp = pd.read_sql(query_pbp, conexion)
+        df_pbp['FGM_asistidos'] = canastas_asistidas(df_pbp)
         df_pbp = df_pbp.merge(df_valid, on=['id_equipo', 'id_partido'], how='inner')
 
         move_map = {
@@ -449,7 +481,7 @@ def calcular_stats_individuales_liga(ultimos_n=None, periodo=None):
         for stat, moves in move_map.items():
             df_pbp[stat] = df_pbp['idMove'].isin(moves).astype(int)
 
-        cols_to_sum = list(move_map.keys())
+        cols_to_sum = list(move_map.keys()) + ['FGM_asistidos']
         df_indiv = df_pbp.groupby(['id_jugador', 'id_equipo'])[cols_to_sum].sum().reset_index()
 
         # 3. STATS EXACTAS EN PISTA Y DIFERENCIALES (Advanced Stats Base)
@@ -595,6 +627,8 @@ def calcular_stats_individuales_liga(ultimos_n=None, periodo=None):
         
         df_final['eFG%'] = ((df_final['FGM'] + 0.5 * df_final['T3_anotados']) / df_final['FGA'].replace(0, pd.NA)) * 100
         df_final['TS%'] = (df_final['Puntos totales'] / (2 * (df_final['FGA'] + 0.44 * df_final['FTA'])).replace(0, pd.NA)) * 100
+        # ASTFGM%: parte de sus canastas de campo que llegan tras una asistencia
+        df_final['ASTFGM%'] = (df_final['FGM_asistidos'] / df_final['FGM'].replace(0, pd.NA)) * 100
 
         player_poss = df_final['FGA'] + 0.44 * df_final['FTA'] + df_final['TOV']
         df_final['%USG'] = (player_poss / (df_final['team_is_FGA'] + 0.44 * df_final['team_is_FTA'] + df_final['team_is_TOV']).replace(0, pd.NA)) * 100
@@ -666,7 +700,7 @@ def calcular_stats_individuales_liga(ultimos_n=None, periodo=None):
         metrics_higher_better = [
             'Minutos Totales', 'Minutos por partido', '% Minutos',
             'Puntos totales', 'Puntos por partido', 'Puntos p100', '%T2', '2PAr',
-            '%T3', '3PAr', '%TL', 'FTr', 'eFG%', 'TS%', '%USG', 'PPP',
+            '%T3', '3PAr', '%TL', 'FTr', 'eFG%', 'TS%', 'ASTFGM%', '%USG', 'PPP',
             'RD pp', 'RD p100', 'DREB%', 'RO pp', 'RO p100', 'OREB%', 'RT pp', 'RT p100', 'REB%',
             'Asistencias pp', 'Asistencias p100', 'AST%', 'AST / TO',
             'STL pp', 'STL p100', 'STL%', 'BLK pp', 'BLK p100', 'BLK%'
@@ -717,7 +751,7 @@ TABLAS_INDIVIDUALES = {
             ("%T3", True), ("3PAr", True),
             ("%TL", True), ("FTr", False),
             ("eFG%", True), ("TS%", True),
-            ("%USG", True)
+            ("ASTFGM%", True), ("%USG", True)
         ]
     },
     "🛡️ Rebote": {
@@ -1079,7 +1113,7 @@ def mostrar_perfil_jugador(id_jugador, ultimos_n=None):
                         ("%T3", True), ("3PAr", True), 
                         ("%TL", True), ("FTr", False), 
                         ("eFG%", True), ("TS%", True),
-                        ("%USG", True), ("PPP", False)
+                        ("ASTFGM%", True), ("%USG", True), ("PPP", False)
                     ]
                 },
                 "🛡️ Rebote": {
@@ -1769,7 +1803,7 @@ elif st.session_state.menu_principal == "Liga":
         dict_stats_indiv = {
             "Impacto": ['Diferencial Offensive Rating', 'Diferencial Defensive Rating', 'Diferencial Net Rating'],
             "Minutos": ['Minutos Totales', 'Minutos por partido', '% Minutos'],
-            "Anotación": ['Rating Anotación', 'Puntos totales', 'Puntos por partido', 'Puntos p100', '%T2', '2PAr', '%T3', '3PAr', '%TL', 'FTr', 'eFG%', 'TS%', '%USG', 'PPP'],
+            "Anotación": ['Rating Anotación', 'Puntos totales', 'Puntos por partido', 'Puntos p100', '%T2', '2PAr', '%T3', '3PAr', '%TL', 'FTr', 'eFG%', 'TS%', 'ASTFGM%', '%USG', 'PPP'],
             "Rebote": ['Rating Rebote', 'RD pp', 'RD p100', 'DREB%', 'RO pp', 'RO p100', 'OREB%', 'RT pp', 'RT p100', 'REB%'],
             "Cuidado de balón": ['Rating Cuidado de Balón', 'Asistencias pp', 'Asistencias p100', 'AST%', 'Pérdidas pp', 'Pérdidas p100', 'TOV%', 'AST / TO'],
             "Defensa": ['Rating Defensa', 'STL pp', 'STL p100', 'STL%', 'BLK pp', 'BLK p100', 'BLK%']

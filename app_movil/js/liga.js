@@ -314,7 +314,7 @@ function htmlIndividuales(datos) {
 // ---------- Cuartos ----------
 // "1er cuarto" -> "1º", "Prórroga" -> "Prórroga"
 export const periodoCorto = (p) => p.replace(/^(\d)\D*cuarto$/, "$1º");
-const NEUTRAS = new Set(["2PAr", "3PAr"]);
+const NEUTRAS = new Set(["2PAr", "3PAr", "ASTFGM%"]);
 const MENOR_ES_MEJOR = new Set(["Pérdidas pp", "Pérdidas p100", "TOV%"]);
 
 function celdaComparada(v, ref, columna, esPct) {
